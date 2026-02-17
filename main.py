@@ -11,7 +11,6 @@ def main(page: ft.Page):
     # --- VERİ YÖNETİMİ ---
     def verileri_yukle():
         try:
-            # page.client_storage yerine daha kararlı olan get_storage kullanımı
             veriler = page.client_storage.get("rehberlik_verisi")
             if veriler:
                 return json.loads(veriler)
@@ -27,12 +26,13 @@ def main(page: ft.Page):
 
     # --- ELEMANLAR ---
     ad_in = ft.TextField(label="Öğrenci Ad Soyad")
+    sinif_in = ft.TextField(label="Sınıf") # Sınıf kutusu geri eklendi
     no_in = ft.TextField(label="Okul No")
     
     ogrenci_secici = ft.Dropdown(label="Öğrenci Seçin", expand=True)
     kat_in = ft.Dropdown(
         label="Görüşme Tipi",
-        options=[ft.dropdown.Option("Öğrenci"), ft.dropdown.Option("Veli")],
+        options=[ft.dropdown.Option("Öğrenci"), ft.dropdown.Option("Veli"), ft.dropdown.Option("Öğretmen")],
         value="Öğrenci"
     )
     tarih_in = ft.TextField(label="Tarih", value=datetime.now().strftime("%d-%m-%Y"))
@@ -43,17 +43,22 @@ def main(page: ft.Page):
     def listeyi_doldur():
         data = verileri_yukle()
         ogrenciler = data.get("ogrenciler", [])
-        ogrenci_secici.options = [ft.dropdown.Option(key=str(o["no"]), text=o["ad"]) for o in ogrenciler]
+        # Dropdown'u temizle ve yeniden oluştur
+        ogrenci_secici.options = [ft.dropdown.Option(key=str(o["no"]), text=f"{o['ad']} - {o.get('sinif', '')}") for o in ogrenciler]
         page.update()
 
     def ogrenci_kaydet(e):
         if ad_in.value and no_in.value:
             data = verileri_yukle()
-            data["ogrenciler"].append({"ad": ad_in.value, "no": no_in.value})
+            data["ogrenciler"].append({
+                "ad": ad_in.value, 
+                "no": no_in.value, 
+                "sinif": sinif_in.value
+            })
             veri_kaydet(data)
-            ad_in.value = ""; no_in.value = ""
+            ad_in.value = ""; no_in.value = ""; sinif_in.value = ""
             listeyi_doldur()
-            page.snack_bar = ft.SnackBar(ft.Text("Kayıt Tamam!"))
+            page.snack_bar = ft.SnackBar(ft.Text("Kayıt Başarılı!"))
             page.snack_bar.open = True
             page.update()
 
@@ -75,53 +80,10 @@ def main(page: ft.Page):
 
     def notlari_getir(e):
         not_listesi.controls.clear()
-        listeyi_doldur() # Listeyi de tazele
         data = verileri_yukle()
         for n in reversed(data.get("notlar", [])):
             if n["ogrenci_no"] == ogrenci_secici.value:
                 not_listesi.controls.append(
                     ft.Container(
                         content=ft.Column([
-                            ft.Text(f"{n['tarih']} | {n['kat']}", weight="bold"),
-                            ft.Text(n['not'])
-                        ]),
-                        padding=10, bgcolor="#eeeeee", border_radius=10
-                    )
-                )
-        page.update()
-
-    # --- TASARIM ---
-    kayit_ekrani = ft.Column([
-        ft.Text("Öğrenci Kaydı", size=20, weight="bold"),
-        ad_in, no_in,
-        ft.ElevatedButton("Öğrenciyi Kaydet", on_click=ogrenci_kaydet),
-        ft.Divider()
-    ])
-
-    not_ekrani = ft.Column([
-        ft.Text("Görüşme Notları", size=20, weight="bold"),
-        ft.Row([ogrenci_secici, ft.ElevatedButton("Listeyi Yenile", on_click=lambda _: listeyi_doldur())]),
-        ft.ElevatedButton("Seçili Öğrencinin Notlarını Getir", on_click=notlari_getir),
-        tarih_in, kat_in, not_txt,
-        ft.ElevatedButton("Notu Kaydet", on_click=notu_kaydet),
-        not_listesi
-    ], visible=False)
-
-    def ekran_degis(e):
-        kayit_ekrani.visible = not kayit_ekrani.visible
-        not_ekrani.visible = not not_ekrani.visible
-        btn_nav.text = "Öğrenci Paneline Dön" if not_ekrani.visible else "Not İşlemlerine Geç"
-        listeyi_doldur()
-        page.update()
-
-    btn_nav = ft.OutlinedButton("Not İşlemlerine Geç", on_click=ekran_degis)
-    page.add(
-        ft.Container(content=ft.Text("REHBERLİK PANELİ", color="white", size=22), bgcolor="blue", padding=15),
-        btn_nav,
-        kayit_ekrani,
-        not_ekrani
-    )
-    listeyi_doldur()
-
-if __name__ == "__main__":
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.getenv("PORT", 8080)))
+                            ft.Text(f"{n['
