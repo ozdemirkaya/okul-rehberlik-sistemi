@@ -1,6 +1,8 @@
 import flet as ft
 from datetime import datetime
 import json
+import os
+ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.getenv("PORT", 8080)))
 
 def main(page: ft.Page):
     page.title = "Rehberlik PWA"
