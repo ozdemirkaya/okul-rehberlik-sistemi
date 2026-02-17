@@ -8,13 +8,15 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.LIGHT
     page.scroll = ft.ScrollMode.AUTO
 
-    # --- VERİ YÖNETİMİ (Client Storage) ---
+    # --- VERİ YÖNETİMİ (Güvenli Depolama) ---
     def verileri_yukle():
-        veriler = page.client_storage.get("rehberlik_verisi")
+        # client_storage hatasını önlemek için get_storage kullanımı
+        veriler = page.client_storage.get("rehberlik_verisi") if hasattr(page, 'client_storage') else None
         return json.loads(veriler) if veriler else {"ogrenciler": [], "notlar": []}
 
     def veri_kaydet(data):
-        page.client_storage.set("rehberlik_verisi", json.dumps(data))
+        if hasattr(page, 'client_storage'):
+            page.client_storage.set("rehberlik_verisi", json.dumps(data))
 
     # --- ELEMANLAR ---
     ad_in = ft.TextField(label="Öğrenci Ad Soyad")
@@ -85,7 +87,10 @@ def main(page: ft.Page):
                 not_listesi.controls.append(
                     ft.Container(
                         content=ft.Column([
-                            ft.Text(f"📅 {n['tarih']} | {n['kat']}", weight="bold"),
+                            ft.Row([
+                                ft.Text(f"📅 {n['tarih']} | {n['kat']}", weight="bold", expand=True),
+                                ft.TextButton("Sil", style=ft.ButtonStyle(color="red"), on_click=lambda _, i=n['id']: not_sil(i))
+                            ]),
                             ft.Text(n['not'])
                         ]),
                         padding=10, bgcolor="#F5F5F5", border_radius=10
@@ -100,18 +105,27 @@ def main(page: ft.Page):
         veri_kaydet(data)
         listeleri_tazele()
 
+    def not_sil(not_id):
+        data = verileri_yukle()
+        data["notlar"] = [n for n in data["notlar"] if n["id"] != not_id]
+        veri_kaydet(data)
+        notlari_listele(None)
+
     # --- TASARIM ---
-    kayit_ekrani = ft.Column([ft.Text("Öğrenci Yönetimi", size=22, weight="bold"), ad_in, sinif_in, no_in, ft.ElevatedButton("Kaydet", on_click=ogrenci_kaydet), ft.Divider(), ogrenci_yonetim_listesi])
-    not_ekrani = ft.Column([ft.Text("Notlar", size=22, weight="bold"), ogrenci_secici, ft.ElevatedButton("Listele", on_click=notlari_listele), ft.Divider(), tarih_in, kat_in, not_txt, ft.ElevatedButton("Notu Kaydet", on_click=notu_kaydet), not_listesi], visible=False)
+    kayit_ekrani = ft.Column([ft.Text("Öğrenci Yönetimi", size=22, weight="bold"), ad_in, sinif_in, no_in, ft.ElevatedButton("Öğrenci Kaydet", on_click=ogrenci_kaydet), ft.Divider(), ogrenci_yonetim_listesi])
+    not_ekrani = ft.Column([ft.Text("Görüşme Notları", size=22, weight="bold"), ogrenci_secici, ft.ElevatedButton("Notları Getir", on_click=notlari_listele), ft.Divider(), tarih_in, kat_in, not_txt, ft.ElevatedButton("Notu Kaydet", on_click=notu_kaydet), ft.Divider(), not_listesi], visible=False)
 
     def ekran_degis(e):
         kayit_ekrani.visible = not kayit_ekrani.visible
         not_ekrani.visible = not not_ekrani.visible
+        btn_nav.text = "Öğrenci Yönetimi" if not_ekrani.visible else "Not İşlemleri"
         page.update()
 
-    page.add(ft.ElevatedButton("Ekran Değiştir", on_click=ekran_degis), kayit_ekrani, not_ekrani)
+    btn_nav = ft.OutlinedButton("Not İşlemlerine Geç", on_click=ekran_degis)
+    page.add(ft.Container(content=ft.Text("REHBERLİK", size=25, color="white"), bgcolor="blue", padding=15, border_radius=10), btn_nav, kayit_ekrani, not_ekrani)
     listeleri_tazele()
 
-# KRİTİK DÜZELTME: Bu satır her zaman en altta olmalı!
 if __name__ == "__main__":
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.getenv("PORT", 8080)))
+    # Render PORT ayarı
+    port = int(os.getenv("PORT", 8080))
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port)
