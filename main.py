@@ -8,29 +8,34 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.LIGHT
     page.scroll = ft.ScrollMode.AUTO
 
-    # --- VERİ YÖNETİMİ (Güvenli Depolama) ---
+    # --- VERİ YÖNETİMİ ---
     def verileri_yukle():
-        # client_storage hatasını önlemek için get_storage kullanımı
-        veriler = page.client_storage.get("rehberlik_verisi") if hasattr(page, 'client_storage') else None
-        return json.loads(veriler) if veriler else {"ogrenciler": [], "notlar": []}
+        veriler = page.client_storage.get("rehberlik_verisi")
+        if veriler:
+            return json.loads(veriler)
+        return {"ogrenciler": [], "notlar": []}
 
     def veri_kaydet(data):
-        if hasattr(page, 'client_storage'):
-            page.client_storage.set("rehberlik_verisi", json.dumps(data))
+        page.client_storage.set("rehberlik_verisi", json.dumps(data))
 
     # --- ELEMANLAR ---
-    ad_in = ft.TextField(label="Öğrenci Ad Soyad")
+    ad_in = ft.TextField(label="Öğrenci Ad Soyad", autofocus=True)
     sinif_in = ft.TextField(label="Sınıf")
     no_in = ft.TextField(label="Okul No")
     
-    ogrenci_secici = ft.Dropdown(label="Öğrenci Seçin")
+    ogrenci_secici = ft.Dropdown(
+        label="Öğrenci Seçin",
+        hint_text="Kayıtlı öğrenci bulunamadı",
+        expand=True
+    )
+    
     kat_in = ft.Dropdown(
         label="Görüşme Tipi",
         options=[ft.dropdown.Option("Öğrenci"), ft.dropdown.Option("Veli"), ft.dropdown.Option("Öğretmen")],
         value="Öğrenci"
     )
     tarih_in = ft.TextField(label="Tarih", value=datetime.now().strftime("%d-%m-%Y"))
-    not_txt = ft.TextField(label="Not", multiline=True, min_lines=3)
+    not_txt = ft.TextField(label="Görüşme Notu", multiline=True, min_lines=3)
     not_listesi = ft.Column(spacing=10)
     ogrenci_yonetim_listesi = ft.Column(spacing=10)
 
@@ -38,15 +43,22 @@ def main(page: ft.Page):
     def listeleri_tazele():
         data = verileri_yukle()
         ogrenciler = sorted(data["ogrenciler"], key=lambda x: x["ad"])
-        ogrenci_secici.options = [ft.dropdown.Option(key=str(o["no"]), text=f"{o['ad']} ({o['no']})") for o in ogrenciler]
         
+        # Dropdown seçeneklerini temizle ve yeniden doldur
+        ogrenci_secici.options = []
+        for o in ogrenciler:
+            ogrenci_secici.options.append(
+                ft.dropdown.Option(key=str(o["no"]), text=f"{o['ad']} ({o['no']})")
+            )
+        
+        # Yönetim listesini tazele
         ogrenci_yonetim_listesi.controls.clear()
         for o in ogrenciler:
             ogrenci_yonetim_listesi.controls.append(
                 ft.Container(
                     content=ft.Row([
                         ft.Column([ft.Text(o["ad"], weight="bold"), ft.Text(f"No: {o['no']}", size=12)], expand=True),
-                        ft.TextButton("Sil", style=ft.ButtonStyle(color="red"), on_click=lambda _, n=o["no"]: ogrenci_sil(n))
+                        ft.IconButton(icon=ft.icons.DELETE, icon_color="red", on_click=lambda _, n=o["no"]: ogrenci_sil(n))
                     ]),
                     padding=10, bgcolor="#F0F4F8", border_radius=8
                 )
@@ -56,11 +68,24 @@ def main(page: ft.Page):
     def ogrenci_kaydet(e):
         if ad_in.value and no_in.value:
             data = verileri_yukle()
-            data["ogrenciler"].append({"ad": ad_in.value, "no": no_in.value, "sinif": sinif_in.value})
+            data["ogrenciler"].append({
+                "ad": ad_in.value, 
+                "no": no_in.value, 
+                "sinif": sinif_in.value
+            })
             veri_kaydet(data)
+            
+            # Başarı mesajı
+            page.snack_bar = ft.SnackBar(ft.Text(f"✅ {ad_in.value} başarıyla kaydedildi!"))
+            page.snack_bar.open = True
+            
+            # Formu temizle ve listeleri zorla tazele
             ad_in.value = ""; no_in.value = ""; sinif_in.value = ""
-            listeleri_tazele() # Bu satır listeyi anında günceller
-            page.update()
+            listeleri_tazele()
+        else:
+            page.snack_bar = ft.SnackBar(ft.Text("❌ Lütfen isim ve numara girin!"))
+            page.snack_bar.open = True
+        page.update()
 
     def notu_kaydet(e):
         if ogrenci_secici.value and not_txt.value:
@@ -75,6 +100,8 @@ def main(page: ft.Page):
             data["notlar"].append(yeni_not)
             veri_kaydet(data)
             not_txt.value = ""
+            page.snack_bar = ft.SnackBar(ft.Text("✅ Not başarıyla eklendi!"))
+            page.snack_bar.open = True
             notlari_listele(None)
         page.update()
 
@@ -82,14 +109,14 @@ def main(page: ft.Page):
         not_listesi.controls.clear()
         data = verileri_yukle()
         if ogrenci_secici.value:
-            notlar = [n for n in data["notlar"] if n["ogrenci_no"] == ogrenci_secici.value]
-            for n in reversed(notlar):
+            filtrelenmis = [n for n in data["notlar"] if n["ogrenci_no"] == ogrenci_secici.value]
+            for n in reversed(filtrelenmis):
                 not_listesi.controls.append(
                     ft.Container(
                         content=ft.Column([
                             ft.Row([
                                 ft.Text(f"📅 {n['tarih']} | {n['kat']}", weight="bold", expand=True),
-                                ft.TextButton("Sil", style=ft.ButtonStyle(color="red"), on_click=lambda _, i=n['id']: not_sil(i))
+                                ft.IconButton(icon=ft.icons.DELETE, icon_color="red", scale=0.8, on_click=lambda _, i=n['id']: not_sil(i))
                             ]),
                             ft.Text(n['not'])
                         ]),
@@ -112,21 +139,44 @@ def main(page: ft.Page):
         notlari_listele(None)
 
     # --- TASARIM ---
-    kayit_ekrani = ft.Column([ft.Text("Öğrenci Yönetimi", size=22, weight="bold"), ad_in, sinif_in, no_in, ft.ElevatedButton("Öğrenci Kaydet", on_click=ogrenci_kaydet), ft.Divider(), ogrenci_yonetim_listesi])
-    not_ekrani = ft.Column([ft.Text("Görüşme Notları", size=22, weight="bold"), ogrenci_secici, ft.ElevatedButton("Notları Getir", on_click=notlari_listele), ft.Divider(), tarih_in, kat_in, not_txt, ft.ElevatedButton("Notu Kaydet", on_click=notu_kaydet), ft.Divider(), not_listesi], visible=False)
+    kayit_ekrani = ft.Column([
+        ft.Text("Öğrenci Yönetimi", size=22, weight="bold"),
+        ad_in, sinif_in, no_in,
+        ft.ElevatedButton("Öğrenciyi Kaydet", on_click=ogrenci_kaydet, icon=ft.icons.SAVE),
+        ft.Divider(),
+        ft.Text("Kayıtlı Öğrenciler:", size=18, weight="bold"),
+        ogrenci_yonetim_listesi
+    ])
+
+    not_ekrani = ft.Column([
+        ft.Text("Görüşme Notları", size=22, weight="bold"),
+        ft.Row([ogrenci_secici, ft.IconButton(icon=ft.icons.REFRESH, on_click=lambda _: listeleri_tazele())]),
+        ft.ElevatedButton("Notları Getir", on_click=notlari_listele, icon=ft.icons.LIST),
+        ft.Divider(),
+        tarih_in, kat_in, not_txt,
+        ft.ElevatedButton("Notu Kaydet", on_click=notu_kaydet, icon=ft.icons.ADD),
+        ft.Divider(),
+        not_listesi
+    ], visible=False)
 
     def ekran_degis(e):
         kayit_ekrani.visible = not kayit_ekrani.visible
         not_ekrani.visible = not not_ekrani.visible
         btn_nav.text = "Öğrenci Yönetimi" if not_ekrani.visible else "Not İşlemleri"
+        if not_ekrani.visible:
+            listeleri_tazele()
         page.update()
 
     btn_nav = ft.OutlinedButton("Not İşlemlerine Geç", on_click=ekran_degis)
-    page.add(ft.Container(content=ft.Text("REHBERLİK", size=25, color="white"), bgcolor="blue", padding=15, border_radius=10), btn_nav, kayit_ekrani, not_ekrani)
+    page.add(
+        ft.Container(content=ft.Text("REHBERLİK", size=25, color="white", weight="bold"), bgcolor="blue", padding=15, border_radius=10),
+        btn_nav, 
+        ft.Divider(),
+        kayit_ekrani, 
+        not_ekrani
+    )
     listeleri_tazele()
 
 if __name__ == "__main__":
-    # Render PORT ayarı
     port = int(os.getenv("PORT", 8080))
     ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port)
-
