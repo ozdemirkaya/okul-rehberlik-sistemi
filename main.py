@@ -2,7 +2,6 @@ import flet as ft
 from datetime import datetime
 import json
 import os
-ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.getenv("PORT", 8080)))
 
 def main(page: ft.Page):
     page.title = "Rehberlik PWA"
@@ -10,7 +9,6 @@ def main(page: ft.Page):
     page.scroll = ft.ScrollMode.AUTO
 
     # --- VERİ YÖNETİMİ (Client Storage) ---
-    # Tarayıcı hafızasında verileri JSON formatında saklayacağız
     def verileri_yukle():
         veriler = page.client_storage.get("rehberlik_verisi")
         return json.loads(veriler) if veriler else {"ogrenciler": [], "notlar": []}
@@ -22,9 +20,7 @@ def main(page: ft.Page):
     ad_in = ft.TextField(label="Öğrenci Ad Soyad")
     sinif_in = ft.TextField(label="Sınıf")
     no_in = ft.TextField(label="Okul No")
-    ogrenci_id_gizli = ft.Text("") 
-    guncellenecek_not_id = ft.Text("")
-
+    
     ogrenci_secici = ft.Dropdown(label="Öğrenci Seçin")
     kat_in = ft.Dropdown(
         label="Görüşme Tipi",
@@ -40,7 +36,6 @@ def main(page: ft.Page):
     def listeleri_tazele():
         data = verileri_yukle()
         ogrenciler = sorted(data["ogrenciler"], key=lambda x: x["ad"])
-        
         ogrenci_secici.options = [ft.dropdown.Option(key=str(o["no"]), text=f"{o['ad']} ({o['no']})") for o in ogrenciler]
         
         ogrenci_yonetim_listesi.controls.clear()
@@ -63,7 +58,7 @@ def main(page: ft.Page):
             veri_kaydet(data)
             ad_in.value = ""; no_in.value = ""; sinif_in.value = ""
             listeleri_tazele()
-            page.update()
+        page.update()
 
     def notu_kaydet(e):
         if ogrenci_secici.value and not_txt.value:
@@ -117,4 +112,6 @@ def main(page: ft.Page):
     page.add(ft.ElevatedButton("Ekran Değiştir", on_click=ekran_degis), kayit_ekrani, not_ekrani)
     listeleri_tazele()
 
-ft.app(target=main, view=ft.AppView.WEB_BROWSER)
+# KRİTİK DÜZELTME: Bu satır her zaman en altta olmalı!
+if __name__ == "__main__":
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=int(os.getenv("PORT", 8080)))
