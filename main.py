@@ -59,8 +59,8 @@ def main(page: ft.Page):
             data["ogrenciler"].append({"ad": ad_in.value, "no": no_in.value, "sinif": sinif_in.value})
             veri_kaydet(data)
             ad_in.value = ""; no_in.value = ""; sinif_in.value = ""
-            listeleri_tazele()
-        page.update()
+            listeleri_tazele() # Bu satır listeyi anında günceller
+            page.update()
 
     def notu_kaydet(e):
         if ogrenci_secici.value and not_txt.value:
@@ -129,3 +129,4 @@ if __name__ == "__main__":
     # Render PORT ayarı
     port = int(os.getenv("PORT", 8080))
     ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=port)
+
